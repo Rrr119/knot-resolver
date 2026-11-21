@@ -1,0 +1,218 @@
+; SPDX-License-Identifier: GPL-3.0-or-later
+; config options
+	stub-addr: 193.0.14.129 	# K.ROOT-SERVERS.NET.
+	query-minimization: off
+CONFIG_END
+
+SCENARIO_BEGIN Test forwarding of recursive sub-queries by policy
+
+; Root server (ordinary recursion path)
+RANGE_BEGIN 0 1000
+	ADDRESS 193.0.14.129
+ENTRY_BEGIN
+MATCH opcode qtype qname
+ADJUST copy_id
+REPLY QR NOERROR
+SECTION QUESTION
+. IN NS
+SECTION ANSWER
+. IN NS	K.ROOT-SERVERS.NET.
+SECTION ADDITIONAL
+K.ROOT-SERVERS.NET.	IN A	193.0.14.129
+ENTRY_END
+
+; Name of the root server itself
+ENTRY_BEGIN
+MATCH opcode qtype qname
+ADJUST copy_id
+REPLY QR NOERROR
+SECTION QUESTION
+K.ROOT-SERVERS.NET. IN A
+SECTION ANSWER
+K.ROOT-SERVERS.NET.	IN A	193.0.14.129
+ENTRY_END
+
+; TLD "test." referral
+ENTRY_BEGIN
+MATCH opcode qtype qname
+ADJUST copy_id copy_query
+REPLY QR NOERROR
+SECTION QUESTION
+recursed.test. IN A
+SECTION AUTHORITY
+test.	IN NS	ns.test.
+SECTION ADDITIONAL
+ns.test.		IN A	198.51.100.10
+ENTRY_END
+
+; TLD "example." referral
+ENTRY_BEGIN
+MATCH opcode qtype qname
+ADJUST copy_id copy_query
+REPLY QR NOERROR
+SECTION QUESTION
+www.example. IN A
+SECTION AUTHORITY
+example.	IN NS	ns.example.
+SECTION ADDITIONAL
+ns.example.		IN A	198.51.100.20
+ENTRY_END
+RANGE_END
+
+; TLD server for "test." reached via ordinary recursion
+RANGE_BEGIN 0 1000
+	ADDRESS 198.51.100.10
+ENTRY_BEGIN
+MATCH opcode qtype qname
+ADJUST copy_id
+REPLY QR NOERROR
+SECTION QUESTION
+test. IN NS
+SECTION ANSWER
+test.		IN NS	ns.test.
+SECTION ADDITIONAL
+ns.test.		IN A	198.51.100.10
+ENTRY_END
+
+ENTRY_BEGIN
+MATCH opcode qtype qname
+ADJUST copy_id
+REPLY QR NOERROR
+SECTION QUESTION
+ns.test. IN A
+SECTION ANSWER
+ns.test.		IN A	198.51.100.10
+ENTRY_END
+
+ENTRY_BEGIN
+MATCH opcode qtype qname
+ADJUST copy_id
+REPLY QR NOERROR
+SECTION QUESTION
+recursed.test. IN A
+SECTION ANSWER
+recursed.test.	IN A	203.0.113.10
+ENTRY_END
+RANGE_END
+
+; TLD server for "example." reached via ordinary recursion
+RANGE_BEGIN 0 1000
+	ADDRESS 198.51.100.20
+ENTRY_BEGIN
+MATCH opcode qtype qname
+ADJUST copy_id
+REPLY QR NOERROR
+SECTION QUESTION
+example. IN NS
+SECTION ANSWER
+example.	IN NS	ns.example.
+SECTION ADDITIONAL
+ns.example.		IN A	198.51.100.20
+ENTRY_END
+
+ENTRY_BEGIN
+MATCH opcode qtype qname
+ADJUST copy_id
+REPLY QR NOERROR
+SECTION QUESTION
+www.example. IN A
+SECTION ANSWER
+www.example.	IN A	203.0.113.20
+ENTRY_END
+RANGE_END
+
+; Dedicated forwarding upstream configured through recursefwd.suffix().
+; In forwarding mode the whole subtree is asked directly, so the root and TLD
+; servers never see a query whose QNAME belongs to this suffix.
+RANGE_BEGIN 0 1000
+	ADDRESS 192.0.2.53
+ENTRY_BEGIN
+MATCH opcode qtype qname
+ADJUST copy_id
+REPLY QR NOERROR
+SECTION QUESTION
+www.forwarded.test. IN A
+SECTION ANSWER
+www.forwarded.test.	IN A	203.0.113.53
+ENTRY_END
+
+; Sub-query resolving the nameserver name is forwarded as well
+ENTRY_BEGIN
+MATCH opcode qtype qname
+ADJUST copy_id
+REPLY QR NOERROR
+SECTION QUESTION
+ns.forwarded.test. IN A
+SECTION ANSWER
+ns.forwarded.test.	IN A	192.0.2.53
+ENTRY_END
+
+; Catch-all so any other in-suffix (sub-)query still gets an answer.
+ENTRY_BEGIN
+MATCH opcode subdomain
+ADJUST copy_id copy_query
+REPLY QR NOERROR
+SECTION QUESTION
+forwarded.test. IN A
+SECTION ANSWER
+forwarded.test.	IN A	203.0.113.54
+ENTRY_END
+RANGE_END
+
+; Query 1: a name inside the policy suffix is answered by the forwarder.
+; The subdomain proves suffix matching rather than an exact-name rule.
+STEP 10 QUERY
+ENTRY_BEGIN
+REPLY RD
+SECTION QUESTION
+www.forwarded.test. IN A
+ENTRY_END
+
+STEP 11 CHECK_ANSWER
+ENTRY_BEGIN
+MATCH all
+REPLY QR RD RA NOERROR
+SECTION QUESTION
+www.forwarded.test. IN A
+SECTION ANSWER
+www.forwarded.test.	IN A	203.0.113.53
+ENTRY_END
+
+; Query 2: name outside the suffix keeps using ordinary recursion.
+STEP 20 QUERY
+ENTRY_BEGIN
+REPLY RD
+SECTION QUESTION
+www.example. IN A
+ENTRY_END
+
+STEP 21 CHECK_ANSWER
+ENTRY_BEGIN
+MATCH all
+REPLY QR RD RA NOERROR
+SECTION QUESTION
+www.example. IN A
+SECTION ANSWER
+www.example.	IN A	203.0.113.20
+ENTRY_END
+
+; Query 3: a different name outside the suffix also uses ordinary recursion,
+; proving the forwarding policy is scoped to the configured subtree only.
+STEP 30 QUERY
+ENTRY_BEGIN
+REPLY RD
+SECTION QUESTION
+recursed.test. IN A
+ENTRY_END
+
+STEP 31 CHECK_ANSWER
+ENTRY_BEGIN
+MATCH all
+REPLY QR RD RA NOERROR
+SECTION QUESTION
+recursed.test. IN A
+SECTION ANSWER
+recursed.test.	IN A	203.0.113.10
+ENTRY_END
+
+SCENARIO_END

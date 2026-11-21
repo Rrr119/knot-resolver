@@ -1,6 +1,10 @@
 Knot Resolver 6.6.0 (2026-1m-dd)
 ================================
 
+Improvements
+------------
+- new recursefwd module: forward recursive sub-queries according to policy rules
+
 Bugfixes
 --------
 - /network/listen: allow dots in interface names to support VLANs (!1940)

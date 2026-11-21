@@ -1,0 +1,17 @@
+{
+  "root": "/home/dev/feedback/uid30813",
+  "B": "/home/dev/feedback/uid30813",
+  "sha": "b38bcad942a93b6f45463651abd20998b63a793b",
+  "wslDistro": "Ubuntu-26.04",
+  "source": {
+    "owner": "CZ-NIC",
+    "repo": "knot-resolver",
+    "sha": "b38bcad942a93b6f45463651abd20998b63a793b"
+  },
+  "fork": {
+    "owner": "Rrr119",
+    "repo": "knot-resolver",
+    "cloneUrl": "https://github.com/Rrr119/knot-resolver.git"
+  },
+  "at": "2026-11-21T05:45:34.920Z"
+}

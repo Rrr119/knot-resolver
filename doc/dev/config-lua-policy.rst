@@ -36,6 +36,7 @@ mentioned features.
    modules-renumber
    config-answer-reordering
    modules-rebinding
+   modules-recursefwd
    modules-refuse_nord
    modules-daf
 
